@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>UNO Score Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.17/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    input {
+      margin-bottom: 10px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 60%;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mx-auto p-4">
+    <h1 class="text-4xl font-bold mb-4 mt-10">UNO Score Tracker</h1>
+    <h2 id="roundNumber" class="text-2xl mb-4">Round: 1</h2>
+    <div id="inputSection" class="animate__animated animate__fadeIn">
+      <label class="mr-2">Number of Players:</label>
+      <input type="number" id="numberOfPlayers" class="mr-2 p-2 border border-gray-300 rounded">
+      <button onclick="setupPlayers()" class="p-2 bg-blue-500 text-white rounded">Next</button>
+    </div>
+    <div id="gameSection" style="display: none;" class="animate__animated animate__fadeIn">
+      <h2 id="currentPlayer" class="text-2xl font-bold mb-4"></h2>
+      <label class="mr-2">Enter the score for this round:</label>
+      <input type="number" id="currentScore" class="mr-2 p-2 border border-gray-300 rounded">
+      <button onclick="nextRound()" class="p-2 bg-blue-500 text-white rounded">Submit</button>
+      <button onclick="endGame()" class="p-2 bg-red-500 text-white rounded">End Game</button>
+      <hr class="my-4">
+      <h2 class="text-2xl font-bold mb-2">Player Scores:</h2>
+      <ul id="playerScores"></ul>
+      <hr class="my-4">
+      <h2 class="text-2xl font-bold mb-2">Statistics:</h2>
+      <p id="highestScore"></p>
+      <p id="averageScore"></p>
+      <hr class="my-4">
+      <h2 class="text-2xl font-bold mb-2">Leaderboard:</h2>
+      <ol id="leaderboard"></ol>
+    </div>
+    <div id="gameOverSection" style="display: none;" class="animate__animated animate__fadeIn">
+      <h2 class="text-2xl font-bold mb-4">Game Over!</h2>
+      <button onclick="showWinnerModal()" class="p-2 bg-green-500 text-white rounded">Show Winner</button>
+    </div>
+
+    <!-- Winner Modal -->
+    <div id="winnerModal" class="modal">
+      <div class="modal-content animate__animated animate__zoomIn">
+        <span class="close" onclick="closeWinnerModal()">&times;</span>
+        <h2 class="text-2xl font-bold mb-4">Winner:</h2>
+        <p id="winnerName" class="mb-2"></p>
+        <p id="winnerScore" class="mb-4"></p>
+        <hr class="my-4">
+        <h2 class="text-2xl font-bold mb-2">Leaderboard:</h2>
+        <ol id="modalLeaderboard"></ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var users = [];
+    var currentPlayer = 0;
+    var maxScore = 0;
+    var roundNumber = 1;
+    var gameOver = false;
+
+    function setupPlayers() {
+      var numberOfPlayers = parseInt(document.getElementById("numberOfPlayers").value);
+      var inputSection = document.getElementById("inputSection");
+      inputSection.classList.add("animate__animated", "animate__fadeOut");
+
+      setTimeout(function() {
+        inputSection.style.display = "none";
+        var gameSection = document.getElementById("gameSection");
+        gameSection.style.display = "block";
+        gameSection.classList.add("animate__animated", "animate__fadeIn");
+      }, 500);
+
+      for (var i = 0; i < numberOfPlayers; i++) {
+        var playerName = prompt("Enter the name of player " + (i + 1) + ":");
+        users.push({ name: playerName, scores: [] });
+      }
+
+      maxScore = parseInt(prompt("Enter the maximum score:"));
+
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById("roundNumber").textContent = "Round: " + roundNumber;
+      document.getElementById("currentPlayer").textContent = "Current Player: " + users[currentPlayer].name;
+
+      var playerScoresList = document.getElementById("playerScores");
+      playerScoresList.innerHTML = "";
+      for (var i = 0; i < users.length; i++) {
+        var player = users[i];
+        var totalScore = player.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        var listItem = document.createElement("li");
+        listItem.textContent = player.name + " (Total Score: " + totalScore + "): " + player.scores.join(", ");
+        playerScoresList.appendChild(listItem);
+      }
+
+      if (gameOver) {
+        document.getElementById("highestScore").textContent = "Highest Score: " + calculateHighestScore();
+        document.getElementById("averageScore").textContent = "Average Score: " + calculateAverageScore();
+        displayLeaderboard();
+      }
+    }
+
+    function nextRound() {
+      var scoreInput = document.getElementById("currentScore");
+      var score = parseInt(scoreInput.value);
+
+      users[currentPlayer].scores.push(score);
+      scoreInput.value = "";
+
+      currentPlayer = (currentPlayer + 1) % users.length;
+      if (currentPlayer === 0) {
+        roundNumber++;
+        if (checkGameOver()) {
+          endGame();
+          return;
+        }
+      }
+
+      updateUI();
+    }
+
+    function checkGameOver() {
+      var highestScore = calculateHighestScore();
+      return highestScore >= maxScore;
+    }
+
+    function endGame() {
+      gameOver = true;
+      updateUI();
+      document.getElementById("gameSection").style.display = "none";
+      document.getElementById("gameOverSection").style.display = "block";
+      document.getElementById("gameOverSection").classList.add("animate__fadeIn");
+    }
+
+    function calculateHighestScore() {
+      var highestScore = -Infinity;
+      for (var i = 0; i < users.length; i++) {
+        var playerTotalScore = users[i].scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        if (playerTotalScore > highestScore) {
+          highestScore = playerTotalScore;
+        }
+      }
+      return highestScore;
+    }
+
+    function calculateAverageScore() {
+      var totalScores = 0;
+      var totalRounds = 0;
+      for (var i = 0; i < users.length; i++) {
+        var playerScores = users[i].scores;
+        totalScores += playerScores.reduce(function (acc, cur) {
+          return acc + cur;
+        }, 0);
+        totalRounds += playerScores.length;
+      }
+      return totalScores / totalRounds;
+    }
+
+    function displayLeaderboard() {
+      var leaderboard = document.getElementById("leaderboard");
+      leaderboard.innerHTML = "";
+
+      var sortedUsers = users.slice().sort(function(a, b) {
+        var totalScoreA = a.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        var totalScoreB = b.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        return totalScoreA - totalScoreB;
+      });
+
+      for (var i = 0; i < sortedUsers.length; i++) {
+        var player = sortedUsers[i];
+        var listItem = document.createElement("li");
+        listItem.textContent = player.name + " - Total Score: " + player.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        leaderboard.appendChild(listItem);
+      }
+    }
+
+    function showWinnerModal() {
+      var winner = getWinner();
+      var modal = document.getElementById("winnerModal");
+      var winnerName = document.getElementById("winnerName");
+      var winnerScore = document.getElementById("winnerScore");
+      var modalLeaderboard = document.getElementById("modalLeaderboard");
+
+      winnerName.textContent = "Winner: " + winner.name;
+      winnerScore.textContent = "Score: " + winner.scores.reduce(function(acc, cur) {
+        return acc + cur;
+      }, 0);
+
+      var sortedUsers = users.slice().sort(function(a, b) {
+        var totalScoreA = a.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        var totalScoreB = b.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        return totalScoreA - totalScoreB;
+      });
+
+      modalLeaderboard.innerHTML = "";
+      for (var i = 0; i < sortedUsers.length; i++) {
+        var player = sortedUsers[i];
+        var listItem = document.createElement("li");
+        listItem.textContent = player.name + " - Total Score: " + player.scores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        modalLeaderboard.appendChild(listItem);
+      }
+
+      modal.style.display = "block";
+    }
+
+    function closeWinnerModal() {
+      var modal = document.getElementById("winnerModal");
+      modal.style.display = "none";
+    }
+
+    function getWinner() {
+      var winner = users[0];
+      for (var i = 1; i < users.length; i++) {
+        var currentPlayerScores = users[i].scores;
+        var winnerScores = winner.scores;
+        var currentPlayerTotalScore = currentPlayerScores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        var winnerTotalScore = winnerScores.reduce(function(acc, cur) {
+          return acc + cur;
+        }, 0);
+        if (currentPlayerTotalScore < winnerTotalScore) {
+          winner = users[i];
+        }
+      }
+      return winner;
+    }
+
+    function resetGame() {
+      users = [];
+      currentPlayer = 0;
+      maxScore = 0;
+      roundNumber = 1;
+      gameOver = false;
+
+      var inputSection = document.getElementById("inputSection");
+      inputSection.style.display = "block";
+      inputSection.classList.remove("animate__fadeOut");
+
+      var gameSection = document.getElementById("gameSection");
+      gameSection.style.display = "none";
+      gameSection.classList.remove("animate__fadeIn");
+
+      var gameOverSection = document.getElementById("gameOverSection");
+      gameOverSection.style.display = "none";
+      gameOverSection.classList.remove("animate__fadeIn");
+    }
+  </script>
+</body>
+</html>
